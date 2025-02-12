@@ -1,5 +1,3 @@
-using System;
-
 namespace CLI.IA.Models;
 
 public class Repo

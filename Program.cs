@@ -1,54 +1,49 @@
-﻿
+﻿using System.Text.Json;
+using CLI.IA.Models;
+using CLI.IA.Utils;
 
-using System.Text.Json;
-using System.Text.Json.Nodes;
-
-Console.WriteLine("Digite o nome do usuário:");
+Console.WriteLine("Enter the username:");
 var nameUser = Console.ReadLine();
 
 HttpClient httpClient = new HttpClient();
 httpClient.DefaultRequestHeaders.Add("User-Agent", "ConsoleApp");
 string apiUrl = $"https://api.github.com/users/{nameUser}/events";
-Console.WriteLine(apiUrl);
-try
-{
-   HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
-    if(response.IsSuccessStatusCode)
-    {
-      string responseBodyJson = await response.Content.ReadAsStringAsync();
-        string formattedJson = FormatJson(responseBodyJson);
-        Console.WriteLine("\nResposta da API formatada:");
-        //Console.WriteLine(formattedJson);
-        foreach(var testes in JsonNode.Parse(formattedJson)!.AsArray())
-        {
-            Console.WriteLine(testes["type"]);
-            var commits = testes["payload"]["commits"].AsArray();
-                Console.WriteLine($"Número de commits: {commits.Count}");
-        }
-    }
-    else
-    {
-        Console.WriteLine($"Erro: {response.StatusCode} - {response.ReasonPhrase}");
-    }
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Erro ao tentar consumir a API: {ex.Message}");
-}
 
-static string FormatJson(string json)
+using HttpResponseMessage response = await httpClient.GetAsync(apiUrl);
+ApiVerify.VerifyResponse(response);
+
+if(response.IsSuccessStatusCode)
 {
+    string responseBodyJson = await response.Content.ReadAsStringAsync();
+
     try
     {
-        JsonNode parsedJson = JsonNode.Parse(json)!; // Parseia o JSON
-        //var teste = JsonSerializer.Serialize(json);
-        return parsedJson!.ToJsonString(new JsonSerializerOptions
+        var eventObject = JsonSerializer.Deserialize<List<Event>>(responseBodyJson, FormatJson.options);
+        
+        if (eventObject == null)
+            Console.WriteLine("Error deserializing JSON");
+
+        foreach (var eventItem in eventObject?.Take(5)!)
         {
-            WriteIndented = true // Indenta o JSON
-        });
+            switch (eventItem.Type)
+            {
+            case "PushEvent":
+                Console.WriteLine($"- Pushed {eventItem.Payload?.Commits?.ToList().Count} to {eventItem.Repo.Name}");
+                break;
+
+            case "CreateEvent":
+                Console.WriteLine($"- CreateEvent to Repository: {eventItem.Repo.Name}");
+                break;
+
+            default:
+                Console.WriteLine($"Event type not found: {eventItem.Type}");
+                break;
+            }
+        }
+        Console.WriteLine("\n...");
     }
-    catch
+    catch (JsonException ex)
     {
-        return json; // Caso dê erro, retorna o JSON original
+        Console.WriteLine($"Error when deserializing JSON: {ex.Message}");
     }
 }

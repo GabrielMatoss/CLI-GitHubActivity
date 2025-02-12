@@ -1,4 +1,3 @@
-using System;
 using CLI.IA.SerializeClass;
 
 namespace CLI.IA.Models;
